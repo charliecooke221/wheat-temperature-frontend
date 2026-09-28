@@ -1,6 +1,5 @@
 // Browser side of Web Push: service worker registration and this device's subscription.
-
-const DEVICE_ID_KEY = "wheat.push.deviceId";
+import { API_BASE_URL } from "../api/client";
 
 export type PushSupport = "supported" | "unsupported" | "ios-needs-install";
 
@@ -30,7 +29,9 @@ export function notificationPermission(): NotificationPermission {
 
 async function registration(): Promise<ServiceWorkerRegistration> {
   const base = import.meta.env.BASE_URL;
-  await navigator.serviceWorker.register(`${base}sw.js`, { scope: base });
+  // The worker needs the API address to re-register itself if the browser renews the subscription.
+  const script = `${base}sw.js?api=${encodeURIComponent(API_BASE_URL)}`;
+  await navigator.serviceWorker.register(script, { scope: base });
   return navigator.serviceWorker.ready;
 }
 
@@ -45,7 +46,8 @@ function keyBytes(base64Url: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
 }
 
-function sameKey(subscription: PushSubscription, vapidPublicKey: string): boolean {
+/** False for a subscription made with an old server key, which can no longer receive alerts. */
+export function usesKey(subscription: PushSubscription, vapidPublicKey: string): boolean {
   const current = subscription.options.applicationServerKey;
   if (!current) return false;
   const expected = keyBytes(vapidPublicKey);
@@ -69,7 +71,7 @@ export async function subscribeThisDevice(vapidPublicKey: string): Promise<PushS
 
   const reg = await registration();
   const existing = await reg.pushManager.getSubscription();
-  if (existing && sameKey(existing, vapidPublicKey)) return existing;
+  if (existing && usesKey(existing, vapidPublicKey)) return existing;
   if (existing) await existing.unsubscribe();
 
   return reg.pushManager.subscribe({
@@ -101,22 +103,4 @@ export function defaultDeviceLabel(): string {
           ? "Safari"
           : "Browser";
   return `${browser} on ${os}`;
-}
-
-// The server id of this browser's subscription, so the device list can mark "this device".
-export function storedDeviceId(): string | null {
-  try {
-    return localStorage.getItem(DEVICE_ID_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function storeDeviceId(id: string | null): void {
-  try {
-    if (id) localStorage.setItem(DEVICE_ID_KEY, id);
-    else localStorage.removeItem(DEVICE_ID_KEY);
-  } catch {
-    // Storage can be unavailable (private mode); the list simply will not mark this device.
-  }
 }

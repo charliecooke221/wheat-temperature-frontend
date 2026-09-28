@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ApiError, getSummary } from "../api/client";
 import type { Summary } from "../api/types";
+import { NotifySignup } from "./NotifySignup";
 import { StoreView } from "./StoreView";
 
 const TemperatureChart = lazy(() =>
@@ -73,6 +74,7 @@ export function Dashboard() {
       <Suspense fallback={<div className="panel skeleton short" aria-label="Loading temperature history" />}>
         <TemperatureChart probes={summary.probes} />
       </Suspense>
+      <NotifySignup />
     </>
   );
 }

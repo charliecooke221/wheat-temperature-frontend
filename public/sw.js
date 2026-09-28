@@ -31,6 +31,32 @@ self.addEventListener("push", (event) => {
   );
 });
 
+// Browsers occasionally renew a push subscription. Register the replacement with the
+// API (passed as ?api= when the page registered this worker) so alerts keep arriving.
+const API_BASE_URL = new URL(self.location.href).searchParams.get("api");
+
+async function postJson(path, body) {
+  return fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      if (!API_BASE_URL) return;
+      const previous = event.oldSubscription;
+      const next =
+        event.newSubscription ||
+        (previous ? await self.registration.pushManager.subscribe(previous.options) : null);
+      if (next) await postJson("/api/v1/push/subscribe", { ...next.toJSON(), label: "Renewed device", renewed: true });
+      if (previous) await postJson("/api/v1/push/unsubscribe", { endpoint: previous.endpoint });
+    })(),
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = event.notification.data?.url || self.registration.scope;

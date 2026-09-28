@@ -52,17 +52,18 @@ API.
 
 ## Push notifications
 
-`public/sw.js` is a small service worker that only shows push notifications. It does
-not cache anything. `public/manifest.webmanifest` lets phones install the site.
+`public/sw.js` is a small service worker that only shows push notifications and
+re-registers a subscription the browser renews. It does not cache anything.
+`public/manifest.webmanifest` lets phones install the site.
 
-On the admin screen, **Turn on for this device** asks for notification permission.
-It then subscribes with the Worker's VAPID public key and saves the subscription through
-`POST /api/v1/admin/push-subscriptions`. The same list shows every registered device
-with a **Remove** button.
+The **Temperature alerts** panel at the bottom of the dashboard is for anyone. **Turn on
+notifications** asks for permission, subscribes with the Worker's public VAPID key and
+saves the subscription through `POST /api/v1/push/subscribe`. **Turn off** removes it
+again. The Admin screen lists every registered device, with a **Remove** button.
 
 - Android / desktop Chrome, Edge and Firefox work from the normal site.
 - iPhone / iPad (iOS 16.4+) only allow push after **Share → Add to Home Screen**. Open
-  the site from the Home Screen icon, sign in to Admin and turn notifications on there.
+  the site from the Home Screen icon and turn notifications on there.
 - If permission was denied, the browser's site settings must be changed. The site
   cannot ask again.
 

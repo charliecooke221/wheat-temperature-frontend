@@ -279,18 +279,27 @@ export async function listPushDevices(token: string): Promise<PushDevice[]> {
   });
 }
 
-export async function savePushDevice(token: string, subscription: PushSubscriptionJSON, label: string): Promise<string> {
-  const body = await request(
-    "/api/v1/admin/push-subscriptions",
-    { method: "POST", body: JSON.stringify({ ...subscription, label }) },
-    token,
-  );
-  if (!isRecord(body) || typeof body.id !== "string") {
-    throw new ApiError(500, "invalid_response", "Subscription response did not include an id.");
-  }
-  return body.id;
-}
-
 export async function deletePushDevice(token: string, id: string): Promise<void> {
   await request(`/api/v1/admin/push-subscriptions/${encodeURIComponent(id)}`, { method: "DELETE" }, token);
+}
+
+export async function getPushPublicKey(): Promise<string | null> {
+  const body = await request("/api/v1/push/public-key");
+  return isRecord(body) ? asString(body.vapidPublicKey) : null;
+}
+
+export async function subscribePush(subscription: PushSubscriptionJSON, label: string): Promise<void> {
+  await request("/api/v1/push/subscribe", {
+    method: "POST",
+    body: JSON.stringify({ ...subscription, label }),
+  });
+}
+
+export async function unsubscribePush(endpoint: string): Promise<void> {
+  await request("/api/v1/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) });
+}
+
+export async function isPushSubscribed(endpoint: string): Promise<boolean> {
+  const body = await request("/api/v1/push/status", { method: "POST", body: JSON.stringify({ endpoint }) });
+  return isRecord(body) && body.subscribed === true;
 }
