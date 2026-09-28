@@ -1,4 +1,14 @@
-import type { AdminConfig, AdminConfigInput, ChartGroup, LayoutProbe, ProbeKind, Readings, Summary, SummaryProbe } from "./types";
+import type {
+  AdminConfig,
+  AdminConfigInput,
+  ChartGroup,
+  LayoutProbe,
+  ProbeKind,
+  PushDevice,
+  Readings,
+  Summary,
+  SummaryProbe,
+} from "./types";
 
 const LIVE_API = "https://wheat-temperature-api.charliecooke221.workers.dev";
 
@@ -185,6 +195,8 @@ export function parseAdminConfig(body: unknown): AdminConfig {
   const recipients = Array.isArray(source.emailRecipients)
     ? source.emailRecipients.filter((address): address is string => typeof address === "string")
     : [];
+  const email = isRecord(body) && isRecord(body.email) ? body.email : null;
+  const push = isRecord(body) && isRecord(body.push) ? body.push : null;
   return {
     alertThresholdC: asNumber(source.alertThresholdC) ?? 25,
     alertCooldownHours: asNumber(source.alertCooldownHours) ?? 24,
@@ -194,6 +206,8 @@ export function parseAdminConfig(body: unknown): AdminConfig {
     lastAlertAt: asString(source.lastAlertAt),
     updatedAt: asString(source.updatedAt),
     probes,
+    emailConfigured: typeof email?.configured === "boolean" ? email.configured : null,
+    vapidPublicKey: asString(push?.vapidPublicKey),
   };
 }
 
@@ -246,4 +260,37 @@ export async function sendTestAlert(token: string): Promise<string> {
   );
   if (isRecord(body) && typeof body.message === "string") return body.message;
   return "Test alert sent.";
+}
+
+export async function listPushDevices(token: string): Promise<PushDevice[]> {
+  const body = await request("/api/v1/admin/push-subscriptions", undefined, token);
+  if (!isRecord(body) || !Array.isArray(body.subscriptions)) return [];
+  return body.subscriptions.flatMap((item) => {
+    if (!isRecord(item) || typeof item.id !== "string") return [];
+    return [
+      {
+        id: item.id,
+        label: asString(item.label),
+        createdAt: asString(item.createdAt) ?? "",
+        lastSuccessAt: asString(item.lastSuccessAt),
+        service: asString(item.service) ?? "",
+      },
+    ];
+  });
+}
+
+export async function savePushDevice(token: string, subscription: PushSubscriptionJSON, label: string): Promise<string> {
+  const body = await request(
+    "/api/v1/admin/push-subscriptions",
+    { method: "POST", body: JSON.stringify({ ...subscription, label }) },
+    token,
+  );
+  if (!isRecord(body) || typeof body.id !== "string") {
+    throw new ApiError(500, "invalid_response", "Subscription response did not include an id.");
+  }
+  return body.id;
+}
+
+export async function deletePushDevice(token: string, id: string): Promise<void> {
+  await request(`/api/v1/admin/push-subscriptions/${encodeURIComponent(id)}`, { method: "DELETE" }, token);
 }

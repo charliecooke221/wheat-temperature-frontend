@@ -41,39 +41,29 @@ https://charliecooke221.github.io/wheat-temperature-frontend/
 1. Settings → Pages → Build and deployment → Source: **GitHub Actions**.
 2. The Worker `ALLOWED_ORIGIN` must include `https://charliecooke221.github.io`. The browser origin does not include the repository path. Local Vite uses `http://localhost:5173`, and both origins are listed together, separated by a comma.
 
-## Admin API contract
+## Admin
 
-The dashboard already uses `GET /api/v1/summary` and `GET /api/v1/readings`. Admin screens call these routes, which phase C3 still has to implement. Errors use `{ "ok": false, "error": "...", "message": "..." }`.
+The **Admin** button opens the settings screen. It signs in with the shared password
+(`POST /api/v1/auth/login`) and keeps the one-hour token in `sessionStorage`, so closing
+the tab ends the session. It edits the probe layout and labels, alert threshold,
+cooldown, on/off switch and email recipients (`GET`/`PUT /api/v1/admin/config`), and
+sends a test alert (`POST /api/v1/admin/alert-test`). The Worker README lists the full
+API.
 
-`POST /api/v1/auth/login`
+## Push notifications
 
-```json
-{ "password": "shared-password" }
-```
+`public/sw.js` is a small service worker that only shows push notifications. It does
+not cache anything. `public/manifest.webmanifest` lets phones install the site.
 
-```json
-{ "ok": true, "token": "<signed-token>", "expiresAt": "2026-09-23T16:00:00Z" }
-```
+On the admin screen, **Turn on for this device** asks for notification permission.
+It then subscribes with the Worker's VAPID public key and saves the subscription through
+`POST /api/v1/admin/push-subscriptions`. The same list shows every registered device
+with a **Remove** button.
 
-`GET` and `PUT /api/v1/admin/config` use a bearer token. `PUT` accepts the editable fields and should return the saved config:
+- Android / desktop Chrome, Edge and Firefox work from the normal site.
+- iPhone / iPad (iOS 16.4+) only allow push after **Share → Add to Home Screen**. Open
+  the site from the Home Screen icon, sign in to Admin and turn notifications on there.
+- If permission was denied, the browser's site settings must be changed. The site
+  cannot ask again.
 
-```json
-{
-  "ok": true,
-  "alertThresholdC": 25,
-  "alertCooldownHours": 24,
-  "alertsEnabled": false,
-  "timezone": "Europe/London",
-  "emailRecipients": ["name@example.com"],
-  "lastAlertAt": null,
-  "updatedAt": "2026-09-23T12:00:00Z",
-  "probes": [
-    { "probeId": "grain-01", "label": "Grain 1", "kind": "grain", "row": 0, "col": 0 },
-    { "probeId": "air-01", "label": "Air", "kind": "air" }
-  ]
-}
-```
-
-`timezone`, `lastAlertAt` and `updatedAt` are read-only. Calibration offsets are not edited here.
-
-`POST /api/v1/admin/alert-test` with `{}` sends a test message to the saved recipients.
+Email is still the main alert. Push is sent from the same alert event and is not retried.

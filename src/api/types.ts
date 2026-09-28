@@ -78,4 +78,16 @@ export interface AdminConfig extends AdminConfigInput {
   timezone: string;
   lastAlertAt: string | null;
   updatedAt: string | null;
+  /** Whether the Worker has Brevo credentials; null when an older API did not say. */
+  emailConfigured: boolean | null;
+  /** VAPID public key for Web Push; null when push is not configured on the Worker. */
+  vapidPublicKey: string | null;
+}
+
+export interface PushDevice {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  lastSuccessAt: string | null;
+  service: string;
 }

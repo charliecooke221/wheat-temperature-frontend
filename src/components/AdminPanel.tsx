@@ -11,6 +11,7 @@ import { gridCells } from "../lib/probes";
 import { clearSession, loadSession, saveSession, type AdminSession } from "../lib/session";
 import { formatTimestamp } from "../lib/time";
 import { ensureGrid, swapGrainPositions, validateConfig } from "../lib/validate";
+import { NotificationsPanel } from "./NotificationsPanel";
 
 function messageFrom(error: unknown, fallback: string): string {
   if (error instanceof ApiError && error.status === 404) {
@@ -255,7 +256,10 @@ function SettingsForm({
         <div className="panel-head">
           <div>
             <h2>Alerts</h2>
-            <p>A high scheduled grain reading emails every enabled recipient, then waits out the cooldown.</p>
+            <p>
+              A scheduled grain reading at or above the threshold emails every recipient (and notifies enabled
+              devices), then waits out the cooldown. Air and manual readings never alert.
+            </p>
           </div>
         </div>
         <div className="field-grid">
@@ -290,6 +294,9 @@ function SettingsForm({
             Alerts enabled
           </label>
         </div>
+        {saved.emailConfigured === false ? (
+          <p className="inline-error">Email sending is not configured on the Worker yet, so alerts cannot be emailed.</p>
+        ) : null}
         <p className="fine">Last alert: {saved.lastAlertAt ? formatTimestamp(saved.lastAlertAt) : "Never"}</p>
         {saved.updatedAt ? <p className="fine">Settings updated {formatTimestamp(saved.updatedAt)}</p> : null}
       </section>
@@ -343,6 +350,12 @@ function SettingsForm({
           ))}
         </ul>
       </section>
+
+      <NotificationsPanel
+        token={session.token}
+        vapidPublicKey={saved.vapidPublicKey}
+        onUnauthorized={onUnauthorized}
+      />
 
       <section className="panel">
         <div className="panel-head">
