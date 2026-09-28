@@ -1,23 +1,7 @@
 # wheat-temperature-frontend
 
-Dashboard for the wheat-store temperature hub. It is a static Vite, React and TypeScript site for GitHub Pages. The browser calls the Cloudflare Worker over HTTPS. No secrets live in this repository.
+Dashboard for the wheat-store temperature hub. It is a static Vite, React and TypeScript site for GitHub Pages. The browser calls the Cloudflare Worker over HTTPS.
 
-Public pages:
-
-- 3×3 grain layout inside a store outline, with two gaps in the bottom edge
-- air in that same section, with its own latest reading and 24-hour range
-- stale, missing and disconnected states
-- hourly, daily, weekly and monthly chart
-- per-probe lines, plus grain average, grain maximum, and a dashed air line
-
-Admin (phase C3 API):
-
-- shared-password login; the one-hour token stays in `sessionStorage`
-- logout, and return to the login screen on expiry or HTTP 401
-- rearrange the 3×3 grid, edit labels, set the alert threshold, cooldown, enabled flag and recipients
-- send a test alert
-
-Web push is intentionally not included yet.
 
 ## Local development
 

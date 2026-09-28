@@ -242,31 +242,11 @@ main { display: grid; gap: 1rem; }
   font-size: 0.95rem;
 }
 
-.temp-35,
-.probe-temp .temp-35,
-.probe-temp .temp-35 span,
-.air-temp .temp-35,
-.air-temp .temp-35 span { color: #7f1d1d; }
-.temp-30,
-.probe-temp .temp-30,
-.probe-temp .temp-30 span,
-.air-temp .temp-30,
-.air-temp .temp-30 span { color: #dc2626; }
-.temp-25,
-.probe-temp .temp-25,
-.probe-temp .temp-25 span,
-.air-temp .temp-25,
-.air-temp .temp-25 span { color: #f58231; }
-.temp-20,
-.probe-temp .temp-20,
-.probe-temp .temp-20 span,
-.air-temp .temp-20,
-.air-temp .temp-20 span { color: #8b9a1a; }
-.temp-low,
-.probe-temp .temp-low,
-.probe-temp .temp-low span,
-.air-temp .temp-low,
-.air-temp .temp-low span { color: #4363d8; }
+.temp-35 { color: #7f1d1d; }
+.temp-30 { color: #dc2626; }
+.temp-25 { color: #f58231; }
+.temp-20 { color: #8b9a1a; }
+.temp-low { color: #4363d8; }
 
 .probe-label, .probe-status {
   overflow-wrap: anywhere;
@@ -290,38 +270,74 @@ main { display: grid; gap: 1rem; }
 .probe.error .probe-status, .probe.disconnected .probe-status { color: var(--alert); }
 
 .chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem 0.7rem;
+  display: grid;
+  gap: 0.4rem;
   margin-top: 0.35rem;
 }
 
-.chart-legend span, .chart-legend button {
-  display: inline-flex;
+.legend-main, .legend-probes {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
-  border: 1px solid transparent;
-  background: transparent;
-  border-radius: 10px;
-  padding: 0.25rem 0.45rem;
-  color: var(--ink-soft);
-  font-size: 0.88rem;
+  gap: 0.35rem 0.6rem;
 }
 
-.chart-legend button.is-on { color: var(--ink); background: var(--paper); border-color: var(--line); }
-.chart-legend i {
-  width: 0.85rem;
-  height: 0.85rem;
-  border-radius: 99px;
-  display: block;
+.legend-main span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0.45rem 0.2rem 0;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
-.chart-legend .air-swatch {
-  width: 0.95rem;
+
+.legend-main i {
+  display: block;
+  width: 1.2rem;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.legend-main .air-swatch {
   height: 0;
   border-radius: 0;
-  border-top: 2px dashed #3d6d8c;
+  border-top: 2px dashed var(--air);
   background: transparent;
 }
+
+.legend-probes { gap: 0.3rem 0.35rem; }
+
+.legend-heading {
+  margin-right: 0.2rem;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.legend-probes button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  padding: 0.15rem 0.4rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.legend-probes button.is-on { color: var(--ink); background: var(--paper); border-color: var(--line); }
+
+.legend-probes i {
+  display: block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 99px;
+}
+
+.legend-probes button:not(.is-on) i { opacity: 0.35; }
 
 .chart-panel { display: grid; gap: 0.75rem; }
 
@@ -379,6 +395,15 @@ main { display: grid; gap: 1rem; }
 
 .chart-tooltip p { margin-bottom: 0.35rem; font-size: 0.85rem; }
 .chart-tooltip ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+.chart-tooltip .tooltip-main li { font-size: 0.86rem; }
+.chart-tooltip .tooltip-main strong { font-weight: 600; }
+.chart-tooltip .tooltip-probes {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 253, 248, 0.18);
+  gap: 0.15rem;
+}
+.chart-tooltip .tooltip-probes li { font-size: 0.76rem; opacity: 0.85; }
 .chart-tooltip li { display: grid; grid-template-columns: 0.55rem 1fr auto; gap: 0.4rem; align-items: center; font-size: 0.82rem; }
 .chart-tooltip li span:first-child { width: 0.55rem; height: 0.55rem; border-radius: 99px; }
 .chart-tooltip strong { font-weight: 500; font-variant-numeric: tabular-nums; }
@@ -407,6 +432,8 @@ main { display: grid; gap: 1rem; }
 .admin, .admin-form { display: grid; gap: 1rem; }
 .admin-bar p { color: var(--ink-soft); align-self: center; }
 .admin-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+.leave-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.leave-confirm p { margin-right: auto; }
 
 .login-panel { max-width: 28rem; display: grid; gap: 0.8rem; }
 .login-panel label, .field-grid label, .label-list label { align-items: stretch; flex-direction: column; }

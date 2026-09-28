@@ -7,6 +7,7 @@ import {
   sendTestAlert,
 } from "../api/client";
 import type { AdminConfig, LayoutProbe } from "../api/types";
+import { gridCells } from "../lib/probes";
 import { clearSession, loadSession, saveSession, type AdminSession } from "../lib/session";
 import { formatTimestamp } from "../lib/time";
 import { ensureGrid, swapGrainPositions, validateConfig } from "../lib/validate";
@@ -17,22 +18,6 @@ function messageFrom(error: unknown, fallback: string): string {
   }
   if (error instanceof ApiError) return error.message;
   return fallback;
-}
-
-function draftSnapshot(config: AdminConfig): string {
-  return JSON.stringify({
-    alertThresholdC: config.alertThresholdC,
-    alertCooldownHours: config.alertCooldownHours,
-    alertsEnabled: config.alertsEnabled,
-    emailRecipients: config.emailRecipients.map((address) => address.trim()).filter(Boolean),
-    probes: config.probes.map((probe) => ({
-      probeId: probe.probeId,
-      label: probe.label.trim(),
-      kind: probe.kind,
-      row: probe.kind === "grain" ? probe.row : undefined,
-      col: probe.kind === "grain" ? probe.col : undefined,
-    })),
-  });
 }
 
 function toInput(config: AdminConfig) {
@@ -54,6 +39,21 @@ function toInput(config: AdminConfig) {
       return next;
     }),
   };
+}
+
+function draftSnapshot(config: AdminConfig): string {
+  return JSON.stringify(toInput(config));
+}
+
+let nextRecipientKey = 0;
+
+function recipientKeys(count: number): number[] {
+  return Array.from({ length: count }, () => nextRecipientKey++);
+}
+
+// Empty or partial number fields become NaN, which validateConfig reports.
+function numberValue(value: number): number | "" {
+  return Number.isNaN(value) ? "" : value;
 }
 
 function LoginForm({ expired, onSuccess }: { expired: boolean; onSuccess: (session: AdminSession) => void }) {
@@ -110,23 +110,37 @@ function LoginForm({ expired, onSuccess }: { expired: boolean; onSuccess: (sessi
   );
 }
 
-function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUnauthorized: () => void }) {
+function SettingsForm({
+  session,
+  onUnauthorized,
+  onDirtyChange,
+}: {
+  session: AdminSession;
+  onUnauthorized: () => void;
+  onDirtyChange: (dirty: boolean) => void;
+}) {
   const [saved, setSaved] = useState<AdminConfig | null>(null);
   const [draft, setDraft] = useState<AdminConfig | null>(null);
+  const [recipientIds, setRecipientIds] = useState<number[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<"save" | "test" | null>(null);
 
+  const reset = useCallback((config: AdminConfig) => {
+    const placed = { ...config, probes: ensureGrid(config.probes) };
+    setSaved(placed);
+    setDraft(placed);
+    setRecipientIds(recipientKeys(placed.emailRecipients.length));
+  }, []);
+
   useEffect(() => {
     let active = true;
     getAdminConfig(session.token)
       .then((config) => {
         if (!active) return;
-        const placed = { ...config, probes: ensureGrid(config.probes) };
-        setSaved(placed);
-        setDraft(placed);
+        reset(config);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -140,10 +154,13 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
     return () => {
       active = false;
     };
-  }, [session.token, onUnauthorized]);
+  }, [session.token, onUnauthorized, reset]);
 
   const errors = useMemo(() => (draft ? validateConfig(draft) : []), [draft]);
   const dirty = saved && draft ? draftSnapshot(saved) !== draftSnapshot(draft) : false;
+
+  useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
 
   function update(patch: Partial<AdminConfig>) {
     setDraft((current) => (current ? { ...current, ...patch } : current));
@@ -185,10 +202,7 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
     try {
       const input = toInput(draft);
       const returned = await saveAdminConfig(session.token, input);
-      const loaded = returned ?? (await getAdminConfig(session.token));
-      const next = { ...loaded, probes: ensureGrid(loaded.probes) };
-      setSaved(next);
-      setDraft(next);
+      reset(returned ?? (await getAdminConfig(session.token)));
       setNotice("Settings saved.");
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 401) onUnauthorized();
@@ -232,12 +246,7 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
     );
   }
 
-  const cells: Array<LayoutProbe | null> = Array.from({ length: 9 }, () => null);
-  for (const probe of draft.probes) {
-    if (probe.kind !== "grain" || probe.row === undefined || probe.col === undefined) continue;
-    const index = probe.row * 3 + probe.col;
-    if (index >= 0 && index < 9) cells[index] = probe;
-  }
+  const cells = gridCells(draft.probes);
   const air = draft.probes.find((probe) => probe.kind === "air");
 
   return (
@@ -257,8 +266,8 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
               min={-10}
               max={60}
               step="0.1"
-              value={draft.alertThresholdC}
-              onChange={(event) => update({ alertThresholdC: Number(event.target.value) })}
+              value={numberValue(draft.alertThresholdC)}
+              onChange={(event) => update({ alertThresholdC: event.target.valueAsNumber })}
             />
           </label>
           <label>
@@ -268,8 +277,8 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
               min={1}
               max={168}
               step="1"
-              value={draft.alertCooldownHours}
-              onChange={(event) => update({ alertCooldownHours: Number(event.target.value) })}
+              value={numberValue(draft.alertCooldownHours)}
+              onChange={(event) => update({ alertCooldownHours: event.target.valueAsNumber })}
             />
           </label>
           <label className="check-field">
@@ -294,7 +303,10 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
           <button
             type="button"
             className="button quiet"
-            onClick={() => update({ emailRecipients: [...draft.emailRecipients, ""] })}
+            onClick={() => {
+              update({ emailRecipients: [...draft.emailRecipients, ""] });
+              setRecipientIds((ids) => [...ids, ...recipientKeys(1)]);
+            }}
           >
             Add recipient
           </button>
@@ -302,7 +314,7 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
         {draft.emailRecipients.length === 0 ? <p className="muted-block">No recipients yet.</p> : null}
         <ul className="recipient-list">
           {draft.emailRecipients.map((address, index) => (
-            <li key={`${index}-${draft.emailRecipients.length}`}>
+            <li key={recipientIds[index] ?? `extra-${index}`}>
               <input
                 type="email"
                 inputMode="email"
@@ -320,9 +332,10 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
               <button
                 type="button"
                 className="button quiet"
-                onClick={() =>
-                  update({ emailRecipients: draft.emailRecipients.filter((_, itemIndex) => itemIndex !== index) })
-                }
+                onClick={() => {
+                  update({ emailRecipients: draft.emailRecipients.filter((_, itemIndex) => itemIndex !== index) });
+                  setRecipientIds((ids) => ids.filter((_, itemIndex) => itemIndex !== index));
+                }}
               >
                 Remove
               </button>
@@ -406,6 +419,8 @@ function SettingsForm({ session, onUnauthorized }: { session: AdminSession; onUn
   );
 }
 
+type LeaveAction = "back" | "logout";
+
 export function AdminPanel({ onBack }: { onBack: () => void }) {
   const [session, setSession] = useState<AdminSession | null>(() => loadSession());
   const [expired, setExpired] = useState(false);
@@ -416,6 +431,9 @@ export function AdminPanel({ onBack }: { onBack: () => void }) {
     setExpired(true);
   }, []);
 
+  const [dirty, setDirty] = useState(false);
+  const [leaving, setLeaving] = useState<LeaveAction | null>(null);
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (session && !loadSession()) expire();
@@ -423,31 +441,60 @@ export function AdminPanel({ onBack }: { onBack: () => void }) {
     return () => window.clearInterval(timer);
   }, [expire, session]);
 
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  function leave(action: LeaveAction) {
+    setLeaving(null);
+    if (action === "back") {
+      onBack();
+      return;
+    }
+    clearSession();
+    setSession(null);
+    setExpired(false);
+  }
+
+  function requestLeave(action: LeaveAction) {
+    if (dirty) setLeaving(action);
+    else leave(action);
+  }
+
   return (
     <div className="admin">
       <div className="admin-bar">
         <p>{session ? "Signed in" : "View only until you sign in"}</p>
         <div className="admin-actions">
-          <button type="button" className="button quiet" onClick={onBack}>
+          <button type="button" className="button quiet" onClick={() => requestLeave("back")}>
             Back to dashboard
           </button>
           {session ? (
-            <button
-              type="button"
-              className="button quiet"
-              onClick={() => {
-                clearSession();
-                setSession(null);
-                setExpired(false);
-              }}
-            >
+            <button type="button" className="button quiet" onClick={() => requestLeave("logout")}>
               Log out
             </button>
           ) : null}
         </div>
       </div>
+      {leaving && dirty ? (
+        <div className="banner leave-confirm" role="alert">
+          <p>You have unsaved changes. Discard them?</p>
+          <button type="button" className="button quiet" onClick={() => setLeaving(null)}>
+            Keep editing
+          </button>
+          <button type="button" className="button" onClick={() => leave(leaving)}>
+            Discard changes
+          </button>
+        </div>
+      ) : null}
       {session ? (
-        <SettingsForm session={session} onUnauthorized={expire} />
+        <SettingsForm session={session} onUnauthorized={expire} onDirtyChange={setDirty} />
       ) : (
         <LoginForm expired={expired} onSuccess={setSession} />
       )}

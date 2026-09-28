@@ -96,6 +96,6 @@ export function formatBucket(bucket: string, group: ChartGroup): { axis: string;
 
 export function timeQualityLabel(quality: string | undefined): string | null {
   if (quality === "unsynced") return "Clock was not synced";
-  if (quality === "rtc") return "Time kept by the hub clock";
+  if (quality === "rtc") return null;
   return null;
 }

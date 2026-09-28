@@ -1,4 +1,4 @@
-import type { SummaryProbe } from "../api/types";
+import type { LayoutProbe, SummaryProbe } from "../api/types";
 import { parseApiTime } from "./time";
 
 export type ProbeCondition = "ok" | "stale" | "disconnected" | "error" | "missing";
@@ -33,19 +33,30 @@ export function conditionLabel(condition: ProbeCondition): string {
   }
 }
 
-export function placeGrainProbes(probes: SummaryProbe[]): Array<SummaryProbe | null> {
-  const cells: Array<SummaryProbe | null> = Array.from({ length: 9 }, () => null);
-  const unplaced: SummaryProbe[] = [];
+type GridProbe = Pick<LayoutProbe, "kind" | "row" | "col">;
+
+/**
+ * Places grain probes into the 3×3 grid, indexed row * 3 + col. Probes with a
+ * missing, out-of-range or already-taken position fill the first free cells.
+ */
+export function gridCells<T extends GridProbe>(probes: T[]): Array<T | null> {
+  const cells: Array<T | null> = Array.from({ length: 9 }, () => null);
+  const unplaced: T[] = [];
   for (const probe of probes) {
     if (probe.kind !== "grain") continue;
-    const row = probe.row;
-    const col = probe.col;
-    const index = row !== undefined && col !== undefined ? row * 3 + col : -1;
-    if (row === undefined || col === undefined || row < 0 || row > 2 || col < 0 || col > 2 || cells[index]) {
-      unplaced.push(probe);
-      continue;
-    }
-    cells[index] = probe;
+    const { row, col } = probe;
+    const validPosition =
+      typeof row === "number" &&
+      typeof col === "number" &&
+      Number.isInteger(row) &&
+      Number.isInteger(col) &&
+      row >= 0 &&
+      row <= 2 &&
+      col >= 0 &&
+      col <= 2;
+    const index = validPosition ? row * 3 + col : -1;
+    if (!validPosition || cells[index]) unplaced.push(probe);
+    else cells[index] = probe;
   }
   for (const probe of unplaced) {
     const hole = cells.indexOf(null);

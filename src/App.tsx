@@ -21,7 +21,7 @@ export function App() {
             />
             <path d="M24 8v32M24 16c-4.7 0-8.2 2.1-10.7 5.2M24 24c4.8 0 8.5 2 11 5.1M24 32c-4.1 0-7.2 1.6-9.5 4" />
           </svg>
-          <h1>Wheat Temperatures</h1>
+          <h1>Wheat Temperature</h1>
         </div>
       </header>
       <main>

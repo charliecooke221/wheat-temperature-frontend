@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { ChartGroup, SummaryProbe } from "../api/types";
+import { useEffect, useMemo, useState } from "react";
+import type { ChartGroup, Readings, SummaryProbe } from "../api/types";
 import { ApiError, getReadings } from "../api/client";
 import { formatBucket, formatRange, formatTemperature } from "../lib/time";
 import {
@@ -19,17 +19,23 @@ const GROUPS: { id: ChartGroup; label: string }[] = [
   { id: "month", label: "Monthly" },
 ];
 
+// Checked with the dataviz palette validator against the panel surface (#fffdf8):
+// adjacent pairs stay distinguishable under colour-blindness simulation.
 const GRAIN_COLORS = [
-  "#4e79a7",
-  "#f28e2b",
-  "#59a14f",
-  "#e15759",
-  "#b07aa1",
-  "#9c755f",
-  "#d37295",
-  "#557f8e",
-  "#8f7c35",
+  "#2a78d6",
+  "#eb6834",
+  "#1baf7a",
+  "#eda100",
+  "#e87ba4",
+  "#008300",
+  "#4a3aa7",
+  "#e34948",
+  "#0f8fa3",
 ];
+
+const AVG_COLOR = "#1f1a14";
+const MAX_COLOR = "#9c3b2e";
+const AIR_COLOR = "#3d6d8c";
 
 interface ChartRow {
   label: string;
@@ -46,7 +52,10 @@ interface TooltipEntry {
   color?: string;
 }
 
-function chartDomain(rows: ChartRow[], keys: string[]): [number, number] {
+const TICK_STEPS = [1, 2, 5, 10, 20];
+
+// Whole-degree y-axis: pads the data range, then snaps both ends to a step that gives at most six gaps.
+function chartScale(rows: ChartRow[], keys: string[]): { domain: [number, number]; ticks: number[] } {
   const values: number[] = [];
   for (const row of rows) {
     for (const key of keys) {
@@ -54,11 +63,17 @@ function chartDomain(rows: ChartRow[], keys: string[]): [number, number] {
       if (typeof value === "number") values.push(value);
     }
   }
-  if (values.length === 0) return [0, 30];
+  if (values.length === 0) return { domain: [0, 30], ticks: [0, 10, 20, 30] };
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const pad = Math.max(0.8, (max - min) * 0.25);
-  return [Math.floor((min - pad) * 10) / 10, Math.ceil((max + pad) * 10) / 10];
+  const pad = Math.max(0.5, (max - min) * 0.1);
+  const span = max - min + pad * 2;
+  const step = TICK_STEPS.find((candidate) => span / candidate <= 6) ?? TICK_STEPS[TICK_STEPS.length - 1];
+  const low = Math.floor((min - pad) / step) * step;
+  const high = Math.ceil((max + pad) / step) * step;
+  const ticks: number[] = [];
+  for (let tick = low; tick <= high; tick += step) ticks.push(tick);
+  return { domain: [low, high], ticks };
 }
 
 function grainColor(probeId: string): string {
@@ -67,23 +82,52 @@ function grainColor(probeId: string): string {
   return GRAIN_COLORS[index] ?? GRAIN_COLORS[0];
 }
 
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipEntry[]; label?: string }) {
+function entryValue(entry: TooltipEntry): number | null {
+  const value = Array.isArray(entry.value) ? entry.value[0] : entry.value;
+  return typeof value === "number" ? value : null;
+}
+
+function TooltipRow({ entry }: { entry: TooltipEntry }) {
+  return (
+    <li>
+      <span style={{ background: entry.color }} />
+      <span>{entry.name}</span>
+      <strong>{formatTemperature(entryValue(entry))}</strong>
+    </li>
+  );
+}
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+  mainKeys,
+}: {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string;
+  mainKeys: string[];
+}) {
   if (!active || !payload || payload.length === 0) return null;
+  const main = mainKeys.flatMap((key) => payload.filter((entry) => String(entry.dataKey) === key));
+  const probes = payload
+    .filter((entry) => !mainKeys.includes(String(entry.dataKey)))
+    .sort((a, b) => (entryValue(b) ?? -Infinity) - (entryValue(a) ?? -Infinity));
   return (
     <div className="chart-tooltip">
       <p>{label}</p>
-      <ul>
-        {payload.map((entry) => {
-          const value = Array.isArray(entry.value) ? entry.value[0] : entry.value;
-          return (
-            <li key={String(entry.dataKey)}>
-              <span style={{ background: entry.color }} />
-              <span>{entry.name}</span>
-              <strong>{formatTemperature(typeof value === "number" ? value : null)}</strong>
-            </li>
-          );
-        })}
+      <ul className="tooltip-main">
+        {main.map((entry) => (
+          <TooltipRow key={String(entry.dataKey)} entry={entry} />
+        ))}
       </ul>
+      {probes.length > 0 ? (
+        <ul className="tooltip-probes">
+          {probes.map((entry) => (
+            <TooltipRow key={String(entry.dataKey)} entry={entry} />
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -91,39 +135,22 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
   const [group, setGroup] = useState<ChartGroup>("day");
   const [hidden, setHidden] = useState<string[]>([]);
-  const [rows, setRows] = useState<ChartRow[]>([]);
+  const [readings, setReadings] = useState<Readings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const grains = probes.filter((probe) => probe.kind === "grain");
   const air = probes.find((probe) => probe.kind === "air") ?? null;
 
-  useEffect(() => {
-    setRows([]);
-    setLoading(true);
-  }, [group]);
-
+  // Readings are hourly, so the chart fetches only when the range changes, not on each summary refresh.
   useEffect(() => {
     const controller = new AbortController();
+    setReadings(null);
     setLoading(true);
     getReadings(group, false, controller.signal)
-      .then((readings) => {
+      .then((next) => {
         if (controller.signal.aborted) return;
-        setRows(
-          readings.points.map((point) => {
-            const labels = formatBucket(point.bucket, group);
-            const row: ChartRow = {
-              label: labels.axis,
-              fullLabel: labels.full,
-              grainAvg: point.grain.avgC,
-              grainMax: point.grain.maxC,
-            };
-            for (const probe of probes) {
-              row[probe.probeId] = point.probes[probe.probeId]?.avgC ?? null;
-            }
-            return row;
-          }),
-        );
+        setReadings(next);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -134,7 +161,24 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [group, probes]);
+  }, [group]);
+
+  const rows = useMemo<ChartRow[]>(() => {
+    if (!readings) return [];
+    return readings.points.map((point) => {
+      const labels = formatBucket(point.bucket, readings.group);
+      const row: ChartRow = {
+        label: labels.axis,
+        fullLabel: labels.full,
+        grainAvg: point.grain.avgC,
+        grainMax: point.grain.maxC,
+      };
+      for (const probe of probes) {
+        row[probe.probeId] = point.probes[probe.probeId]?.avgC ?? null;
+      }
+      return row;
+    });
+  }, [readings, probes]);
 
   function toggleProbe(probeId: string) {
     setHidden((current) => (current.includes(probeId) ? current.filter((id) => id !== probeId) : [...current, probeId]));
@@ -146,7 +190,8 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
     "grainMax",
     ...(air ? [air.probeId] : []),
   ];
-  const domain = chartDomain(rows, plottedKeys);
+  const scale = chartScale(rows, plottedKeys);
+  const mainKeys = ["grainAvg", "grainMax", ...(air ? [air.probeId] : [])];
 
   return (
     <section className="panel chart-panel" aria-labelledby="chart-heading">
@@ -195,9 +240,9 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
                 tickLine={false}
                 axisLine={false}
                 width={48}
-                domain={domain}
-                tickCount={4}
-                tickFormatter={(value: number) => `${Number(value).toFixed(1)}°`}
+                domain={scale.domain}
+                ticks={scale.ticks}
+                tickFormatter={(value: number) => `${value}°`}
               />
               <Tooltip
                 content={(props) => {
@@ -207,6 +252,7 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
                       active={props.active}
                       label={point?.payload?.fullLabel}
                       payload={props.payload as TooltipEntry[] | undefined}
+                      mainKeys={mainKeys}
                     />
                   );
                 }}
@@ -219,9 +265,10 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
                     dataKey={probe.probeId}
                     name={probe.label}
                     stroke={grainColor(probe.probeId)}
-                    strokeWidth={1.5}
-                    strokeOpacity={1}
+                    strokeWidth={1}
+                    strokeOpacity={0.75}
                     dot={rows.length < 3}
+                    activeDot={{ r: 2.5, strokeWidth: 0 }}
                     connectNulls={false}
                     isAnimationActive={false}
                   />
@@ -231,8 +278,8 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
                 type="monotone"
                 dataKey="grainAvg"
                 name="Grain average"
-                stroke="#1f1a14"
-                strokeWidth={2.6}
+                stroke={AVG_COLOR}
+                strokeWidth={3.2}
                 dot={rows.length < 3}
                 connectNulls={false}
                 isAnimationActive={false}
@@ -241,8 +288,8 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
                 type="monotone"
                 dataKey="grainMax"
                 name="Grain maximum"
-                stroke="#9c3b2e"
-                strokeWidth={2.6}
+                stroke={MAX_COLOR}
+                strokeWidth={3.2}
                 dot={rows.length < 3}
                 connectNulls={false}
                 isAnimationActive={false}
@@ -252,7 +299,7 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
                   type="monotone"
                   dataKey={air.probeId}
                   name={air.label}
-                  stroke="#3d6d8c"
+                  stroke={AIR_COLOR}
                   strokeWidth={2}
                   strokeDasharray="5 4"
                   dot={rows.length < 3}
@@ -265,36 +312,41 @@ export function TemperatureChart({ probes }: { probes: SummaryProbe[] }) {
         </div>
       ) : null}
 
-      <div className="chart-legend" role="group" aria-label="Chart lines">
-        <span>
-          <i style={{ background: "#1f1a14" }} />
-          Grain average
-        </span>
-        <span>
-          <i style={{ background: "#9c3b2e" }} />
-          Grain maximum
-        </span>
-        {air ? (
+      <div className="chart-legend">
+        <div className="legend-main">
           <span>
-            <i className="air-swatch" />
-            {air.label}
+            <i style={{ background: AVG_COLOR }} />
+            Grain average
           </span>
-        ) : null}
-        {grains.map((probe) => {
-          const visible = !hidden.includes(probe.probeId);
-          return (
-            <button
-              key={probe.probeId}
-              type="button"
-              aria-pressed={visible}
-              className={visible ? "is-on" : undefined}
-              onClick={() => toggleProbe(probe.probeId)}
-            >
-              <i style={{ background: grainColor(probe.probeId) }} />
-              {probe.label}
-            </button>
-          );
-        })}
+          <span>
+            <i style={{ background: MAX_COLOR }} />
+            Grain maximum
+          </span>
+          {air ? (
+            <span>
+              <i className="air-swatch" />
+              {air.label}
+            </span>
+          ) : null}
+        </div>
+        <div className="legend-probes" role="group" aria-label="Grain probe lines">
+          <span className="legend-heading">Probes</span>
+          {grains.map((probe) => {
+            const visible = !hidden.includes(probe.probeId);
+            return (
+              <button
+                key={probe.probeId}
+                type="button"
+                aria-pressed={visible}
+                className={visible ? "is-on" : undefined}
+                onClick={() => toggleProbe(probe.probeId)}
+              >
+                <i style={{ background: grainColor(probe.probeId) }} />
+                {probe.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

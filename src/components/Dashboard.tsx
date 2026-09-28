@@ -26,10 +26,15 @@ export function Dashboard() {
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => {
+    const refreshIfVisible = () => {
       if (document.visibilityState === "visible") void load();
-    }, 60_000);
-    return () => window.clearInterval(timer);
+    };
+    const timer = window.setInterval(refreshIfVisible, 60_000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
   }, [load]);
 
   if (loading && !summary) {

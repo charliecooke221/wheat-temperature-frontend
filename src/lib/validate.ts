@@ -1,4 +1,5 @@
 import type { AdminConfigInput, LayoutProbe } from "../api/types";
+import { gridCells } from "./probes";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -58,32 +59,10 @@ export function validateConfig(draft: AdminConfigInput): string[] {
 }
 
 export function ensureGrid(probes: LayoutProbe[]): LayoutProbe[] {
-  const cells: Array<LayoutProbe | undefined> = Array.from({ length: 9 });
-  const unplaced: LayoutProbe[] = [];
-  for (const probe of probes) {
-    if (probe.kind !== "grain") continue;
-    const { row, col } = probe;
-    const validPosition =
-      typeof row === "number" &&
-      typeof col === "number" &&
-      Number.isInteger(row) &&
-      Number.isInteger(col) &&
-      row >= 0 &&
-      row <= 2 &&
-      col >= 0 &&
-      col <= 2;
-    const index = validPosition ? row * 3 + col : -1;
-    if (!validPosition || cells[index]) unplaced.push(probe);
-    else cells[index] = probe;
-  }
-  for (const probe of unplaced) {
-    const hole = cells.findIndex((cell) => cell === undefined);
-    if (hole === -1) break;
-    cells[hole] = { ...probe, row: Math.floor(hole / 3), col: hole % 3 };
-  }
-  const placed = new Map(
-    cells.flatMap((probe) => (probe ? [[probe.probeId, probe] as const] : [])),
-  );
+  const placed = new Map<string, LayoutProbe>();
+  gridCells(probes).forEach((probe, index) => {
+    if (probe) placed.set(probe.probeId, { ...probe, row: Math.floor(index / 3), col: index % 3 });
+  });
   return probes.map((probe) => placed.get(probe.probeId) ?? probe);
 }
 

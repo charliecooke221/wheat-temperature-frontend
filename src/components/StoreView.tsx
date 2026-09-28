@@ -1,5 +1,5 @@
 import type { Summary, SummaryProbe } from "../api/types";
-import { conditionLabel, placeGrainProbes, probeCondition, type ProbeCondition } from "../lib/probes";
+import { conditionLabel, gridCells, probeCondition, type ProbeCondition } from "../lib/probes";
 import { formatAge, formatTimestamp, timeQualityLabel } from "../lib/time";
 
 function temperatureBand(value: number): string {
@@ -45,7 +45,7 @@ function ProbeCard({ probe, condition }: { probe: SummaryProbe; condition: Probe
 }
 
 export function StoreView({ summary }: { summary: Summary }) {
-  const cells = placeGrainProbes(summary.probes);
+  const cells = gridCells(summary.probes);
   const air = summary.air ?? summary.probes.find((probe) => probe.kind === "air") ?? null;
   const airCondition = air ? probeCondition(air, summary.staleAfterMinutes, summary.stale) : "missing";
   const quality = timeQualityLabel(summary.probes.find((probe) => probe.latest)?.latest?.timeQuality);
@@ -56,7 +56,7 @@ export function StoreView({ summary }: { summary: Summary }) {
       <div className="panel-head">
         <h2 id="store-heading">Grain store</h2>
         <div className="sample-meta">
-          <p className="eyebrow">Last scheduled sample</p>
+          <p className="eyebrow">Latest sample</p>
           <p className="sample-time">{formatTimestamp(summary.lastSampleAt)}</p>
           {age ? <p className="fine">{age}</p> : null}
           {quality ? <p className="fine">{quality}</p> : null}
