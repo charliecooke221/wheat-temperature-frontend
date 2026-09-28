@@ -72,6 +72,7 @@ function parseProbe(value: unknown): SummaryProbe | null {
         sampledAt: asString(value.latest.sampledAt),
         receivedAt: asString(value.latest.receivedAt) ?? "",
         sampleId: asString(value.latest.sampleId) ?? "",
+        source: asString(value.latest.source) ?? "scheduled",
         timeQuality: asString(value.latest.timeQuality) ?? "unsynced",
       }
     : null;
@@ -100,6 +101,7 @@ export async function getSummary(): Promise<Summary> {
     stale: body.stale === true,
     staleAfterMinutes: asNumber(body.staleAfterMinutes) ?? 120,
     lastSampleAt: asString(body.lastSampleAt),
+    lastScheduledAt: asString(body.lastScheduledAt),
     probes,
     air: parseProbe(body.air),
   };

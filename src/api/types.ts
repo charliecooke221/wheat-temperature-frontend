@@ -8,6 +8,7 @@ export interface ProbeLatest {
   sampledAt: string | null;
   receivedAt: string;
   sampleId: string;
+  source: string;
   timeQuality: string;
 }
 
@@ -27,6 +28,7 @@ export interface Summary {
   stale: boolean;
   staleAfterMinutes: number;
   lastSampleAt: string | null;
+  lastScheduledAt: string | null;
   probes: SummaryProbe[];
   air: SummaryProbe | null;
 }

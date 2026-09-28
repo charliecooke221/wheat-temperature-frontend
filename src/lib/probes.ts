@@ -3,18 +3,15 @@ import { parseApiTime } from "./time";
 
 export type ProbeCondition = "ok" | "stale" | "disconnected" | "error" | "missing";
 
-export function probeCondition(
-  probe: SummaryProbe,
-  staleAfterMinutes: number,
-  pageStale: boolean,
-): ProbeCondition {
+// Judged on the probe's own latest reading (which may be manual); the dashboard banner covers a stalled schedule.
+export function probeCondition(probe: SummaryProbe, staleAfterMinutes: number): ProbeCondition {
   if (!probe.latest) return "missing";
   if (probe.latest.status === "disconnected") return "disconnected";
   if (probe.latest.status !== "ok" || probe.latest.temperatureC === null) return "error";
   const stamp = probe.latest.sampledAt ?? probe.latest.receivedAt;
   const date = stamp ? parseApiTime(stamp) : null;
   const old = !date || Date.now() - date.getTime() > staleAfterMinutes * 60 * 1000;
-  if (pageStale || old) return "stale";
+  if (old) return "stale";
   return "ok";
 }
 

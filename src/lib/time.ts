@@ -18,7 +18,7 @@ export function parseApiTime(value: string): Date | null {
 }
 
 export function formatTimestamp(value: string | null): string {
-  if (!value) return "No scheduled reading yet";
+  if (!value) return "No reading yet";
   const date = parseApiTime(value);
   if (!date) return value;
   return new Intl.DateTimeFormat(undefined, {
@@ -49,7 +49,7 @@ export function formatTemperature(value: number | null | undefined): string {
 export function formatRange(group: ChartGroup): string {
   switch (group) {
     case "hour":
-      return "Last 24 hours";
+      return "Last 48 hours";
     case "day":
       return "Last 30 days";
     case "week":
@@ -72,7 +72,7 @@ export function formatBucket(bucket: string, group: ChartGroup): { axis: string;
 
   if (group === "hour") {
     return {
-      axis: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date),
+      axis: new Intl.DateTimeFormat(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(date),
       full: new Intl.DateTimeFormat(undefined, {
         day: "numeric",
         month: "short",

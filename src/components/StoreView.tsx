@@ -47,9 +47,13 @@ function ProbeCard({ probe, condition }: { probe: SummaryProbe; condition: Probe
 export function StoreView({ summary }: { summary: Summary }) {
   const cells = gridCells(summary.probes);
   const air = summary.air ?? summary.probes.find((probe) => probe.kind === "air") ?? null;
-  const airCondition = air ? probeCondition(air, summary.staleAfterMinutes, summary.stale) : "missing";
+  const airCondition = air ? probeCondition(air, summary.staleAfterMinutes) : "missing";
   const quality = timeQualityLabel(summary.probes.find((probe) => probe.latest)?.latest?.timeQuality);
   const age = formatAge(summary.lastSampleAt);
+  const newest = summary.probes.find(
+    (probe) => (probe.latest?.sampledAt ?? probe.latest?.receivedAt) === summary.lastSampleAt,
+  );
+  const manual = newest?.latest?.source === "manual";
 
   return (
     <section className="store" aria-labelledby="store-heading">
@@ -58,7 +62,7 @@ export function StoreView({ summary }: { summary: Summary }) {
         <div className="sample-meta">
           <p className="eyebrow">Latest sample</p>
           <p className="sample-time">{formatTimestamp(summary.lastSampleAt)}</p>
-          {age ? <p className="fine">{age}</p> : null}
+          {age ? <p className="fine">{manual ? `Manual reading · ${age}` : age}</p> : null}
           {quality ? <p className="fine">{quality}</p> : null}
         </div>
       </div>
@@ -89,7 +93,7 @@ export function StoreView({ summary }: { summary: Summary }) {
               <ProbeCard
                 key={probe.probeId}
                 probe={probe}
-                condition={probeCondition(probe, summary.staleAfterMinutes, summary.stale)}
+                condition={probeCondition(probe, summary.staleAfterMinutes)}
               />
             );
           })}
