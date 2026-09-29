@@ -7,6 +7,7 @@
   --ink-soft: #5c5348;
   --line: #e0d5c3;
   --wheat: #8c6424;
+  --wheat-light: #c79a4a;
   --ok: #3d6b4f;
   --stale: #8a5a12;
   --alert: #9c3b2e;
@@ -61,19 +62,17 @@ p { margin: 0; }
 }
 
 .wheat-logo {
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 3rem;
+  height: 3rem;
+  margin-right: -0.2rem;
   flex: 0 0 auto;
   color: var(--wheat);
 }
 
-.wheat-logo path:last-child {
-  fill: none;
-  stroke: var(--paper-2);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
+.grain-body { fill: currentColor; }
+.grain-lit { fill: var(--wheat-light); }
+/* The crease is cut out in the page colour, splitting the kernel into two halves. */
+.grain-crease { fill: none; stroke: var(--paper); stroke-width: 1.6; }
 
 .topbar h1 { font-size: clamp(2rem, 4vw, 2.8rem); line-height: 1; }
 

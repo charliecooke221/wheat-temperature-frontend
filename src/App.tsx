@@ -15,11 +15,11 @@ export function App() {
       <header className="topbar">
         <div className="brand">
           <svg className="wheat-logo" viewBox="0 0 48 48" aria-hidden="true">
-            <path
-              d="M24 4C13.6 9.4 8 18.1 8 27.2 8 37 14.5 44 24 44s16-7 16-16.8C40 18.1 34.4 9.4 24 4Z"
-              fill="currentColor"
-            />
-            <path d="M24 8v32M24 16c-4.7 0-8.2 2.1-10.7 5.2M24 24c4.8 0 8.5 2 11 5.1M24 32c-4.1 0-7.2 1.6-9.5 4" />
+            <g transform="rotate(24 24 24)">
+              <path className="grain-body" d="M24 7C30.6 7 35.4 15.4 35.4 25 35.4 35.2 30.4 42.6 24 42.6S12.6 35.2 12.6 25C12.6 15.4 17.4 7 24 7Z" />
+              <path className="grain-lit" d="M24 7C30.6 7 35.4 15.4 35.4 25 35.4 35.2 30.4 42.6 24 42.6 27.6 36.4 28.4 29.8 28.4 25 28.4 18.6 27 12.2 24 7Z" />
+              <path className="grain-crease" d="M24 7C27 12.2 28.4 18.6 28.4 25 28.4 29.8 27.6 36.4 24 42.6" />
+            </g>
           </svg>
           <h1>Wheat Temperature</h1>
         </div>

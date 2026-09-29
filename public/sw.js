@@ -25,7 +25,7 @@ self.addEventListener("push", (event) => {
       body: typeof data.body === "string" ? data.body : "",
       tag: typeof data.tag === "string" ? data.tag : "wheat-alert",
       renotify: true,
-      icon: "favicon.svg",
+      icon: "icon-192.png",
       data: { url: typeof data.url === "string" ? data.url : self.registration.scope },
     }),
   );
