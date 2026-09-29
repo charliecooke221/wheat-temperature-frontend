@@ -2,6 +2,7 @@ import type {
   AdminConfig,
   AdminConfigInput,
   ChartGroup,
+  HubPower,
   LayoutProbe,
   ProbeKind,
   PushDevice,
@@ -100,6 +101,14 @@ function parseProbe(value: unknown): SummaryProbe | null {
   return probe;
 }
 
+function parseHubPower(value: unknown): HubPower | null {
+  if (!isRecord(value)) return null;
+  return {
+    batteryV: asNumber(value.batteryV),
+    externalPower: value.externalPower === true,
+  };
+}
+
 export async function getSummary(): Promise<Summary> {
   const body = await request("/api/v1/summary");
   if (!isRecord(body) || !Array.isArray(body.probes)) {
@@ -114,6 +123,7 @@ export async function getSummary(): Promise<Summary> {
     lastScheduledAt: asString(body.lastScheduledAt),
     probes,
     air: parseProbe(body.air),
+    hubPower: parseHubPower(body.hubPower),
   };
 }
 

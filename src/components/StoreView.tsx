@@ -1,4 +1,4 @@
-import type { Summary, SummaryProbe } from "../api/types";
+import type { HubPower, Summary, SummaryProbe } from "../api/types";
 import { conditionLabel, gridCells, probeCondition, type ProbeCondition } from "../lib/probes";
 import { formatAge, formatTimestamp, timeQualityLabel } from "../lib/time";
 
@@ -28,6 +28,13 @@ function RangeTemps({ min, max }: { min: number | null; max: number | null }) {
     </>
   );
 }
+function hubPowerLabel(power: HubPower | null | undefined): string | null {
+  if (!power) return null;
+  if (power.externalPower) return "Hub plugged in";
+  if (power.batteryV === null) return null;
+  return `Hub battery ${power.batteryV.toFixed(2)} V`;
+}
+
 function ProbeCard({ probe, condition }: { probe: SummaryProbe; condition: ProbeCondition }) {
   return (
     <article className={`probe ${condition}`}>
@@ -54,6 +61,7 @@ export function StoreView({ summary }: { summary: Summary }) {
     (probe) => (probe.latest?.sampledAt ?? probe.latest?.receivedAt) === summary.lastSampleAt,
   );
   const manual = newest?.latest?.source === "manual";
+  const power = hubPowerLabel(summary.hubPower);
 
   return (
     <section className="store" aria-labelledby="store-heading">
@@ -64,6 +72,7 @@ export function StoreView({ summary }: { summary: Summary }) {
           <p className="sample-time">{formatTimestamp(summary.lastSampleAt)}</p>
           {age ? <p className="fine">{manual ? `Manual reading · ${age}` : age}</p> : null}
           {quality ? <p className="fine">{quality}</p> : null}
+          {power ? <p className="fine">{power}</p> : null}
         </div>
       </div>
       <div className="building">

@@ -31,6 +31,13 @@ export interface Summary {
   lastScheduledAt: string | null;
   probes: SummaryProbe[];
   air: SummaryProbe | null;
+  /** Hub power from the newest sample; absent from older APIs. */
+  hubPower?: HubPower | null;
+}
+
+export interface HubPower {
+  batteryV: number | null;
+  externalPower: boolean;
 }
 
 export interface ProbeAggregate {
